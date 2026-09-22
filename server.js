@@ -316,7 +316,10 @@ app.get("/blog/admin", (req, res) => {
       label{display:block;font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 6px}
       .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:0 15px;border:1px solid var(--mint);border-radius:9px;background:var(--mint);color:#06130f;font-weight:750;font-size:13px;cursor:pointer}
       html[data-theme="light"] .btn{color:#fff}
-      .btn.sec{background:transparent;color:var(--ink);border-color:var(--line);font-weight:500}
+      .btn.sec{background:var(--panel-2);color:var(--ink);border-color:var(--line);font-weight:600}
+      .btn.sec:hover{border-color:var(--mint);color:var(--mint);background:var(--mint-soft)}
+      #fmtbar .btn{min-height:34px;padding:0 11px;font-size:13px}
+      #fmtbar .btn b,#fmtbar .btn i,#fmtbar .btn s{color:inherit}
       .btn.danger{background:transparent;border-color:#d66;color:#e88}
       .admin{display:grid;grid-template-columns:280px 1fr;gap:20px}
       .plist{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:10px;max-height:78vh;overflow:auto}
