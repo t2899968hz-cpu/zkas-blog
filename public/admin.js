@@ -87,7 +87,7 @@
       '<div><label>Cover image URL</label><div style="display:flex;gap:8px"><input id="f_cover" value="' + esc(p.cover) + '" placeholder="/blog-media/…">' +
       '<button class="btn sec" id="cov_up" type="button">Upload</button></div></div></div>' +
       (p.cover ? '<img class="cov-prev" id="cov_prev" src="' + esc(p.cover) + '">' : '<img class="cov-prev" id="cov_prev" style="display:none">') +
-      '<div class="toolbar">' +
+      '<div class="toolbar" id="fmtbar">' +
       '<button class="btn sec" id="ins_b" type="button" title="Bold (Ctrl/Cmd+B)"><b>B</b></button>' +
       '<button class="btn sec" id="ins_i" type="button" title="Italic (Ctrl/Cmd+I)"><i>I</i></button>' +
       '<button class="btn sec" id="ins_strike" type="button" title="Strikethrough"><s>S</s></button>' +
@@ -137,6 +137,11 @@
       body.selectionStart = s + before.length; body.selectionEnd = s + before.length + sel.length;
       preview();
     }
+    // Keep the textarea focused/selected when a toolbar button is pressed —
+    // otherwise mousedown moves focus to the button and collapses the selection,
+    // so bold/italic/etc. would wrap nothing.
+    var fmtbar = document.getElementById("fmtbar");
+    if (fmtbar) fmtbar.addEventListener("mousedown", function (ev) { if (ev.target.closest("button")) ev.preventDefault(); });
     function bind(id, before, after) { var el = document.getElementById(id); if (el) el.onclick = function () { insert(before, after); }; }
     bind("ins_b", "**", "**");
     bind("ins_i", "*", "*");
