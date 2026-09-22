@@ -1,0 +1,22 @@
+{
+  "name": "zkas-blog",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ZKas blog + Markdown admin panel (zkas.info/blogs, /blog/<slug>, /blog/admin)",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "setup": "node setup.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "markdown-it": "^14.1.0",
+    "multer": "^2.4.0",
+    "sanitize-html": "^2.13.1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "ISC"
+}
