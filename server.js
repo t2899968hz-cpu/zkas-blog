@@ -38,7 +38,9 @@ if (!fs.existsSync(SECRETS_FILE)) {
 const SECRETS = JSON.parse(fs.readFileSync(SECRETS_FILE, "utf8"));
 
 // ---------- markdown + sanitize ----------
-const md = new MarkdownIt({ html: false, linkify: true, typographer: true });
+// breaks:true → a single newline becomes <br>, so pasted prose keeps its line
+// breaks instead of collapsing lines together (blank line still starts a new <p>).
+const md = new MarkdownIt({ html: false, linkify: true, typographer: true, breaks: true });
 function renderMarkdown(src) {
   const raw = md.render(String(src || ""));
   return sanitizeHtml(raw, {
