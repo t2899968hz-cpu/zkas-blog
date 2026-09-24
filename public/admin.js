@@ -22,6 +22,73 @@
   }
   function fmt(iso) { try { return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch (e) { return ""; } }
 
+  // ---------- HTML → Markdown (for rich paste from Word/LibreOffice/Docs/web) ----------
+  function inlineMd(node) { var o = ""; node.childNodes.forEach(function (n) { o += nodeMd(n); }); return o; }
+  function blockMd(node) { var o = ""; node.childNodes.forEach(function (n) { o += nodeMd(n); }); return o; }
+  function listMd(node, ordered) {
+    var i = 0, out = [];
+    node.childNodes.forEach(function (li) {
+      if (li.nodeType === 1 && li.tagName.toLowerCase() === "li") {
+        i++;
+        var marker = ordered ? (i + ". ") : "- ";
+        var parts = "", nested = "";
+        li.childNodes.forEach(function (c) {
+          if (c.nodeType === 1 && /^(ul|ol)$/.test(c.tagName.toLowerCase())) {
+            nested += "\n" + listMd(c, c.tagName.toLowerCase() === "ol").split("\n").map(function (l) { return "  " + l; }).join("\n");
+          } else { parts += nodeMd(c); }
+        });
+        out.push(marker + parts.replace(/\s+/g, " ").trim() + nested);
+      }
+    });
+    return out.join("\n");
+  }
+  function tableMd(table) {
+    var rows = [];
+    table.querySelectorAll("tr").forEach(function (tr) {
+      var cells = [];
+      tr.querySelectorAll("th,td").forEach(function (td) { cells.push(inlineMd(td).replace(/\s+/g, " ").trim().replace(/\|/g, "\\|")); });
+      if (cells.length) rows.push(cells);
+    });
+    if (!rows.length) return "";
+    var out = "| " + rows[0].join(" | ") + " |\n| " + rows[0].map(function () { return "---"; }).join(" | ") + " |\n";
+    rows.slice(1).forEach(function (r) { out += "| " + r.join(" | ") + " |\n"; });
+    return out + "\n";
+  }
+  function nodeMd(n) {
+    if (n.nodeType === 3) return n.nodeValue.replace(/\s+/g, " ");
+    if (n.nodeType !== 1) return "";
+    var tag = n.tagName.toLowerCase(), inner;
+    switch (tag) {
+      case "br": return "  \n";
+      case "strong": case "b": inner = inlineMd(n).trim(); return inner ? "**" + inner + "**" : "";
+      case "em": case "i": inner = inlineMd(n).trim(); return inner ? "*" + inner + "*" : "";
+      case "s": case "strike": case "del": inner = inlineMd(n).trim(); return inner ? "~~" + inner + "~~" : "";
+      case "code": if (n.closest("pre")) return n.textContent; inner = n.textContent.trim(); return inner ? "`" + inner + "`" : "";
+      case "a": inner = inlineMd(n).trim(); var href = n.getAttribute("href") || ""; return href && inner ? "[" + inner + "](" + href + ")" : inner;
+      case "img": var alt = n.getAttribute("alt") || "", src = n.getAttribute("src") || ""; return src ? "![" + alt + "](" + src + ")" : "";
+      case "u": case "span": case "font": case "sub": case "sup": case "small": case "mark": case "abbr": return inlineMd(n);
+      case "p": case "div": case "section": case "article": inner = blockMd(n).trim(); return inner ? inner + "\n\n" : "";
+      case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
+        inner = inlineMd(n).replace(/\s+/g, " ").trim(); return inner ? new Array(+tag[1] + 1).join("#") + " " + inner + "\n\n" : "";
+      case "blockquote": inner = blockMd(n).trim(); return inner ? inner.split("\n").map(function (l) { return l ? "> " + l : ">"; }).join("\n") + "\n\n" : "";
+      case "ul": return listMd(n, false) + "\n\n";
+      case "ol": return listMd(n, true) + "\n\n";
+      case "pre": return "```\n" + n.textContent.replace(/\n+$/, "") + "\n```\n\n";
+      case "hr": return "\n---\n\n";
+      case "table": return tableMd(n);
+      case "head": case "style": case "script": case "meta": case "title": return "";
+      default: return blockMd(n);
+    }
+  }
+  function htmlToMarkdown(html) {
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    ["style", "script", "meta", "title", "head"].forEach(function (t) {
+      Array.prototype.forEach.call(doc.querySelectorAll(t), function (e) { e.remove(); });
+    });
+    var mdtext = blockMd(doc.body || doc.documentElement);
+    return mdtext.replace(/ /g, " ").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+
   // ---------- login ----------
   function renderLogin(err) {
     app.innerHTML =
@@ -162,6 +229,25 @@
       if (k === "b") { ev.preventDefault(); insert("**", "**"); }
       else if (k === "i") { ev.preventDefault(); insert("*", "*"); }
       else if (k === "k") { ev.preventDefault(); insert("[", "](https://)"); }
+    });
+    // Replace the current selection with raw text (used by rich paste).
+    function replaceSel(text) {
+      var s = body.selectionStart, en = body.selectionEnd, v = body.value;
+      body.value = v.slice(0, s) + text + v.slice(en);
+      var pos = s + text.length; body.focus(); body.selectionStart = body.selectionEnd = pos;
+      preview();
+    }
+    // Paste from Word/LibreOffice/Docs/web: convert the clipboard HTML to clean
+    // Markdown so bold/italic/headings/lists/links/paragraphs survive.
+    body.addEventListener("paste", function (ev) {
+      var cd = ev.clipboardData || window.clipboardData; if (!cd) return;
+      var html = cd.getData("text/html");
+      if (!html || !html.trim()) return; // plain text → let the browser paste normally
+      var mdtext = "";
+      try { mdtext = htmlToMarkdown(html); } catch (e) { return; }
+      if (!mdtext) return;
+      ev.preventDefault();
+      replaceSel(mdtext);
     });
 
     function pickImage(cb) {

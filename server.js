@@ -202,12 +202,16 @@ img{max-width:100%}
 .tag{font:600 11px var(--mono);color:var(--mint);border:1px solid var(--line);background:var(--mint-soft);border-radius:999px;padding:2px 9px}
 .empty{border:1px dashed var(--line);border-radius:14px;padding:40px;text-align:center;color:var(--muted)}
 /* article */
-.article{max-width:760px;margin:0 auto}
+.article{--rsize:20px;max-width:720px;margin:0 auto}
+.rsize{display:inline-flex;gap:4px}
+.rsize button{min-width:30px;height:28px;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:7px;cursor:pointer;font-family:var(--sans);line-height:1}
+.rsize button.on{border-color:var(--mint);color:var(--mint);background:var(--mint-soft)}
+.rsize .s1{font-size:12px}.rsize .s2{font-size:14px}.rsize .s3{font-size:17px}
 .article .back{color:var(--muted);font-size:13px}
 .article .cover{width:100%;aspect-ratio:16/9;object-fit:cover;border:1px solid var(--line);border-radius:16px;margin:14px 0 8px}
 .article h1{font-size:38px;letter-spacing:-.025em;line-height:1.12;margin:14px 0 6px}
 .article .sub{font-size:19px;color:var(--muted);margin:0 0 12px}
-.body-md{font-size:17px;line-height:1.75}
+.body-md{font-size:var(--rsize,20px);line-height:1.8}
 .body-md>*:first-child{margin-top:0}
 .body-md h2{font-size:26px;letter-spacing:-.015em;margin:34px 0 10px}
 .body-md h3{font-size:20px;margin:26px 0 8px}
@@ -254,6 +258,9 @@ ${canonical ? `<link rel="canonical" href="${esc(canonical)}">` : ""}
 function u(){var l=r.dataset.theme==='light';i.textContent=l?'☾':'☼';}
 if(!r.dataset.theme){try{r.dataset.theme=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}catch(e){r.dataset.theme='dark';}}
 u();b.addEventListener('click',function(){r.dataset.theme=r.dataset.theme==='light'?'dark':'light';try{localStorage.setItem('zkas-theme',r.dataset.theme);}catch(e){}u();});})();
+(function(){var SZ={s:'17px',m:'20px',l:'24px'},a=document.querySelector('.article'),btns=document.querySelectorAll('.rsize button');if(!a||!btns.length)return;var cur='m';try{cur=localStorage.getItem('zkas-blog-size')||'m';}catch(e){}
+function ap(s){if(!SZ[s])s='m';a.style.setProperty('--rsize',SZ[s]);btns.forEach(function(x){x.classList.toggle('on',x.getAttribute('data-s')===s);});try{localStorage.setItem('zkas-blog-size',s);}catch(e){}}
+btns.forEach(function(x){x.addEventListener('click',function(){ap(x.getAttribute('data-s'));});});ap(cur);})();
 </script>
 </body></html>`;
 }
@@ -442,7 +449,10 @@ app.get("/blog/:slug", (req, res) => {
     }));
   }
   const body = `<article class="article">
-    <a class="back" href="/blogs">← Blog</a>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <a class="back" href="/blogs">← Blog</a>
+      <div class="rsize" role="group" aria-label="Text size"><button type="button" data-s="s" class="s1" title="Small">A</button><button type="button" data-s="m" class="s2" title="Medium">A</button><button type="button" data-s="l" class="s3" title="Large">A</button></div>
+    </div>
     ${p.status !== "published" ? `<div class="tag" style="margin:10px 0">Draft preview</div>` : ""}
     ${p.cover ? `<img class="cover" src="${esc(p.cover)}" alt="${esc(p.title)}">` : ""}
     <div class="meta" style="margin-top:14px"><span>${esc(fmtDate(p.published || p.created))}</span></div>
