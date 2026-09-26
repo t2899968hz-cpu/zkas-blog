@@ -311,6 +311,13 @@ ${items}
 </channel></rss>`);
 });
 
+// Public: latest published post (small JSON, for the homepage teaser).
+app.get("/blog/api/latest", (req, res) => {
+  const p = loadAll().find((x) => x.status === "published");
+  res.set("Cache-Control", "public, max-age=60").set("Access-Control-Allow-Origin", "*");
+  res.json({ post: p ? { slug: p.slug, title: p.title, subtitle: p.subtitle || "", published: p.published || p.created } : null });
+});
+
 // Admin dashboard / login page (HTML shell; logic in /blog/admin/app.js)
 app.get("/blog/admin", (req, res) => {
   res.type("html").set("Cache-Control", "no-store").send(shell({
