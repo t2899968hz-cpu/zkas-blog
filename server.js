@@ -318,6 +318,68 @@ app.get("/blog/api/latest", (req, res) => {
   res.json({ post: p ? { slug: p.slug, title: p.title, subtitle: p.subtitle || "", published: p.published || p.created } : null });
 });
 
+// ---------- Fundraiser: live multisig balance across EVM chains ----------
+const FUND_ADDR = "0x61bA62DFBca4bf07682f895d266A68C2AcdB3BbC";
+const FUND_CHAINS = [
+  { name: "Ethereum", rpc: "https://ethereum-rpc.publicnode.com", native: "ETH",
+    tokens: [["USDT", "0xdAC17F958D2ee523a2206206994597C13D831ec7", 6], ["USDC", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", 6]] },
+  { name: "Base", rpc: "https://base-rpc.publicnode.com", native: "ETH",
+    tokens: [["USDC", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", 6], ["USDT", "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2", 6]] },
+  { name: "Arbitrum", rpc: "https://arbitrum-one-rpc.publicnode.com", native: "ETH",
+    tokens: [["USDT", "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", 6], ["USDC", "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", 6]] },
+  { name: "Polygon", rpc: "https://polygon-bor-rpc.publicnode.com", native: null,
+    tokens: [["USDT", "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", 6], ["USDC", "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359", 6], ["USDC.e", "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", 6]] },
+];
+let FUND_CACHE = { at: 0, data: null };
+async function evmRpc(url, method, params) {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), signal: AbortSignal.timeout(9000) });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || "rpc error");
+  return j.result;
+}
+function hexToAmount(hex, dec) { if (!hex || hex === "0x") return 0; try { return Number(BigInt(hex)) / Math.pow(10, dec); } catch (e) { return 0; } }
+async function ethPriceUsd() {
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd", { signal: AbortSignal.timeout(6000) });
+    const j = await r.json(); return Number(j.ethereum && j.ethereum.usd) || null;
+  } catch (e) { return null; }
+}
+async function fundBalance() {
+  if (FUND_CACHE.data && Date.now() - FUND_CACHE.at < 60000) return FUND_CACHE.data;
+  const ethUsd = await ethPriceUsd();
+  const pad = FUND_ADDR.toLowerCase().replace(/^0x/, "").padStart(64, "0");
+  const chains = []; let total = 0;
+  await Promise.all(FUND_CHAINS.map(async (c) => {
+    const row = { name: c.name, usd: 0, items: [], ok: false };
+    try {
+      const calls = [];
+      if (c.native) calls.push(evmRpc(c.rpc, "eth_getBalance", [FUND_ADDR, "latest"]).then((h) => ({ sym: "ETH", amt: hexToAmount(h, 18), native: true })));
+      for (const [sym, addr, dec] of c.tokens)
+        calls.push(evmRpc(c.rpc, "eth_call", [{ to: addr, data: "0x70a08231" + pad }, "latest"]).then((h) => ({ sym, amt: hexToAmount(h, dec), native: false })));
+      const results = await Promise.all(calls);
+      for (const it of results) {
+        if (it.amt <= 0) continue;
+        const usd = it.native ? (ethUsd ? it.amt * ethUsd : 0) : it.amt;
+        row.items.push({ sym: it.sym, amount: it.amt, usd });
+        row.usd += usd;
+      }
+      row.ok = true;
+    } catch (e) { row.err = String(e.message || e); }
+    chains.push(row);
+  }));
+  chains.sort((a, b) => FUND_CHAINS.findIndex((c) => c.name === a.name) - FUND_CHAINS.findIndex((c) => c.name === b.name));
+  for (const r of chains) total += r.usd;
+  const data = { address: FUND_ADDR, usd: Math.round(total), ethUsd, chains, asOf: new Date().toISOString() };
+  FUND_CACHE = { at: Date.now(), data };
+  return data;
+}
+app.get("/api/fund-balance", (req, res) => {
+  fundBalance()
+    .then((d) => res.set("Cache-Control", "public, max-age=60").set("Access-Control-Allow-Origin", "*").json(d))
+    .catch((e) => res.status(502).json({ error: String(e.message || e) }));
+});
+
 // Admin dashboard / login page (HTML shell; logic in /blog/admin/app.js)
 app.get("/blog/admin", (req, res) => {
   res.type("html").set("Cache-Control", "no-store").send(shell({
